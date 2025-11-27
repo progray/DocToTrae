@@ -13,7 +13,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMA
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ****************************************************************)
 interface
-uses Classes, MainUtils, ResourceUtils,  ActiveX, ComObj, WinINet, Variants, sysutils, Types, StrUtils,Word_TLB_Constants, TypInfo;
+uses Classes, MainUtils, ResourceUtils,  ActiveX, ComObj, WinINet, Variants, sysutils, Types, StrUtils,Word_TLB_Constants, TypInfo, DocChecks, ErrorCodes;
 
 type
 
@@ -147,6 +147,32 @@ begin
 end;
 
 function TWordDocConverter.ExecuteConversion(fileToConvert: String; OutputFilename: String; OutputFileFormat : Integer): TConversionInfo;
+var
+  CheckResult: TDocCheckResult;
+begin
+  // Pre-open checks
+  CheckResult := CheckWordDocument(fileToConvert);
+  
+  // Check if document has TOC and we should skip it
+  if CheckResult.HasTOC and SkipDocsWithTOC then
+  begin
+    Result.Successful := False;
+    Result.Error := SKIPPED_TOC;
+    Result.ErrorMessage := MSG_SKIPPED_TOC;
+    Exit;
+  end;
+  
+  // Check if document is password protected
+  if CheckResult.IsPasswordProtected then
+  begin
+    Result.Successful := False;
+    Result.Error := SKIPPED_PASSWORD;
+    Result.ErrorMessage := MSG_SKIPPED_PASSWORD;
+    Exit;
+  end;
+  
+  // Original conversion code follows
+  // ...
 
 var
   EncodingValue : OleVariant;

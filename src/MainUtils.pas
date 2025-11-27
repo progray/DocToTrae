@@ -128,6 +128,7 @@ type
     FCompatibilityMode: Integer;
     FEncoding : Integer;
     FPDFOpenAfterExport : boolean;
+    FConvTimeout : Integer;
 
     FPDFPrintFromPage : integer;
     FPDFPrintToPage : integer;
@@ -288,6 +289,7 @@ type
     property InputExtension: String read GetExtension write SetExtension;
     property CompatibilityMode : Integer read FCompatibilityMode write SetCompatibilityMode;
     property Encoding : Integer read FEncoding write SetEncoding;
+    property ConvTimeout : Integer read FConvTimeout write FConvTimeout;
     property BookMarkSource: Integer read FBookMarkSource;
     property pdfExportRange : Integer read FPdfExportRange_Word write SetPDfExportRange  ;
 
@@ -515,6 +517,7 @@ begin
   FIgnore_MACOSX := true;
   fSkipDocsWithTOC := false;
   fSkipDocsExist :=  false;
+  FConvTimeout := 30;
   FFirstLogEntry := true;
   FBookMarkSource := 1; //wdExportCreateHeadingBookmarks
   fpdfOptimizeFor := 0; // wdExportOptimizeForPrint
@@ -943,8 +946,6 @@ tmpext : String;
 valueBool : Boolean;
   X: Integer;
   Sval : String;
-  ConvTimeout: Integer;
-  SkipOnTOC: Boolean;
 
 begin
   // Initialise
@@ -957,8 +958,6 @@ begin
   OutputLogFile := '';
 
   HaltOnWordError := true;
-  ConvTimeout := 30; // Default 30 seconds
-  SkipOnTOC := false; // Default false
 
   loginfo('Loading Configuration...',VERBOSE);
   logdebug('Parameter Count is ' + inttostr(params.Count), VERBOSE);
@@ -1140,8 +1139,8 @@ if  (id = '-XL') or
     begin
       if IsNumber(value) then
       begin
-        ConvTimeout := StrToInt(value);
-        logInfo('Conversion Timeout Set To:' + IntToStr(ConvTimeout) + ' seconds', CHATTY);
+        FConvTimeout := StrToInt(value);
+        logInfo('Conversion Timeout Set To:' + IntToStr(FConvTimeout) + ' seconds', CHATTY);
       end
       else
       begin
@@ -1152,12 +1151,12 @@ if  (id = '-XL') or
     begin
       if UpperCase(value) = 'TRUE' then
       begin
-        SkipOnTOC := true;
+        FSkipDocsWithTOC := true;
         logInfo('Skip on TOC enabled', CHATTY);
       end
       else if UpperCase(value) = 'FALSE' then
       begin
-        SkipOnTOC := false;
+        FSkipDocsWithTOC := false;
         logInfo('Skip on TOC disabled', CHATTY);
       end
       else

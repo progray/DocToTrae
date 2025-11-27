@@ -1,4 +1,4 @@
-﻿program docto;
+program docto;
 (*************************************************************
 Copyright © 2012-2016 Toby Allen (https://github.com/tobya)
 
@@ -37,7 +37,11 @@ uses
   VisioUtils in 'VisioUtils.pas',
   Visio_TLB in 'Visio_TLB.pas',
   DynamicFileNameGenerator in 'shared\DynamicFileNameGenerator.pas',
-  DocToExceptions in 'Exceptions\DocToExceptions.pas';
+  DocToExceptions in 'Exceptions\DocToExceptions.pas',
+  ErrorCodes in 'ErrorCodes.pas',
+  IgnoreListManager in 'IgnoreListManager.pas',
+  TimeoutWatcher in 'TimeoutWatcher.pas',
+  DocChecks in 'DocChecks.pas';
 
 var
   i, Converter : integer;
