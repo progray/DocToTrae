@@ -1,4 +1,4 @@
-﻿unit WordUtils;
+unit WordUtils;
 (*************************************************************
 Copyright © 2012 Toby Allen (https://github.com/tobya)
 
@@ -186,18 +186,25 @@ begin
                                 );
 
 
-          // For some reason if the document contains a TableofContents, it hangs Word.  In older
-          // versions it popped up a dialog.  Until someone can find a work around, the docs will be skipped.
-          // Issue  #40  - experimental as it gets some false positives.
+          // Check for Table of Contents
           if SkipDocsWithTOC then
           begin
             if Wordapp.ActiveDocument.TablesOfContents.count > 0 then
             begin
              logInfo('[SKIPPED] - Document has TOC: ' + fileToConvert , STANDARD);
              Result.Successful := false;
-             Result.Error := '[SKIPPED] - Document has Table of Contents.';
+             Result.Error := 'SKIPPED_TOC';
              ExitAction := aClose;
             end;
+          end;
+
+          // Check for password protection
+          if Wordapp.ActiveDocument.ProtectionType <> wdNoProtection then
+          begin
+            logInfo('[SKIPPED] - Password Protected Document: ' + fileToConvert , STANDARD);
+            Result.Successful := false;
+            Result.Error := 'SKIPPED_PASSWORD';
+            ExitAction := aClose;
           end;
         except
         on E: Exception do
@@ -208,7 +215,7 @@ begin
           begin
              logInfo('[SKIPPED] - Password Protected:' + fileToConvert, STANDARD);
              Result.Successful := false;
-             Result.Error := '[SKIPPED] - Password Protected:';
+             Result.Error := 'SKIPPED_PASSWORD';
              ExitAction := aExit;
           end
           else

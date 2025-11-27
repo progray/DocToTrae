@@ -674,14 +674,20 @@ begin
             logdebug('Executing Conversion ... ' + FileToCreate,VERBOSE);
 
             // *************************
-            // Execute Conversion
+            // Execute Conversion with timeout
             // *************************
             ConversionInfo :=  ExecuteConversion(FileToConvert, FileToCreate, OutputFileFormat);
 
-
-            if ConversionInfo.Successful then
+            // Check for timeout
+            EndTime := getTickCount();
+            if (EndTime - StartTime) > (ConvTimeout * 1000) then
             begin
-              EndTime := getTickCount();
+              logInfo('[TIMEOUT] - Conversion took longer than ' + IntToStr(ConvTimeout) + ' seconds: ' + FileToConvert , STANDARD);
+              ConversionInfo.Successful := false;
+              ConversionInfo.Error := 'TIMEOUT';
+            end
+            else if ConversionInfo.Successful then
+            begin
               CheckDocumentTiming(StartTime, EndTime, FileToConvert);
             end;
 
@@ -937,6 +943,8 @@ tmpext : String;
 valueBool : Boolean;
   X: Integer;
   Sval : String;
+  ConvTimeout: Integer;
+  SkipOnTOC: Boolean;
 
 begin
   // Initialise
@@ -949,6 +957,8 @@ begin
   OutputLogFile := '';
 
   HaltOnWordError := true;
+  ConvTimeout := 30; // Default 30 seconds
+  SkipOnTOC := false; // Default false
 
   loginfo('Loading Configuration...',VERBOSE);
   logdebug('Parameter Count is ' + inttostr(params.Count), VERBOSE);
@@ -1118,13 +1128,42 @@ if  (id = '-XL') or
         LogInfo('Log Level Set To:' + IntToStr(LogLevel),LogLevel);
       end
     end
-    else if (id  = '-Q') or
+    else if (id = '-Q') or
             (id = '--QUIET') then
     begin
 
       OutputLog := false;
       // Doesn't require a value
       dec(iParam);
+    end
+    else if (id = '--CONV-TIMEOUT') then
+    begin
+      if IsNumber(value) then
+      begin
+        ConvTimeout := StrToInt(value);
+        logInfo('Conversion Timeout Set To:' + IntToStr(ConvTimeout) + ' seconds', CHATTY);
+      end
+      else
+      begin
+        HaltWithConfigError(200, 'Conversion Timeout must be a number: ' + value);
+      end
+    end
+    else if (id = '--SKIP-ON-TOC') then
+    begin
+      if UpperCase(value) = 'TRUE' then
+      begin
+        SkipOnTOC := true;
+        logInfo('Skip on TOC enabled', CHATTY);
+      end
+      else if UpperCase(value) = 'FALSE' then
+      begin
+        SkipOnTOC := false;
+        logInfo('Skip on TOC disabled', CHATTY);
+      end
+      else
+      begin
+        HaltWithConfigError(200, 'Skip on TOC must be TRUE or FALSE: ' + value);
+      end
     end
     else if (id = '-T') or (id = '-TF') or
             (id = '--FORMAT') or (id = '--FORCEFORMAT') then
@@ -1654,13 +1693,65 @@ end;
 
 function TDocumentConverter.OnConversionError(InputFile, OutputFile, Error: String):string;
 var url_end : string;
+  sl : TStringList;
+  ignorecount : integer;
+  timestamp : string;
+const
+  ignorelistfilename = 'docto.ignore.txt';
 begin
+  // Standardize error code
+  if Pos('SKIPPED_PASSWORD', Error) > 0 then
+    Error := 'SKIPPED_PASSWORD'
+  else if Pos('SKIPPED_TOC', Error) > 0 then
+    Error := 'SKIPPED_TOC'
+  else if Pos('TIMEOUT', Error) > 0 then
+    Error := 'TIMEOUT'
+  else if Pos('EOle', Error) > 0 then
+    Error := 'COM_ERROR'
+  else
+    Error := 'UNKNOWN';
 
+  // Log error
+  logError('Conversion Error: ' + InputFile + ' - ' + Error, STANDARD);
+
+  // Call webhook
   url_end :=  'action=error&type='+ FOutputFileFormatString + '&outputfilename=' + URLEncode(OutputFile)
                                   + '&inputfilename=' + URLEncode(InputFile)
-                                    + '&error=' + Error;
+                                    + '&error=' + URLEncode(Error);
   CallWebHook(url_end);
 
+  // Add to ignore list
+  if (Ignore_ErrorDocs) then
+  begin
+    sl := TStringList.Create();
+    try
+      if FileExists(ignorelistfilename) then
+      begin
+        sl.LoadFromFile(ignorelistfilename);
+      end else begin
+        sl.Add('[Comments]');
+        sl.Add('COMMENT1=THIS FILE RECORDS ANY WORD DOCUMENTS THAT TOOK LONGER THAN X SECONDS TO COMPLETE.');
+        sl.Add('COMMENT2=THIS SHOULD, OVER TIME ALLOW YOU TO TRACK DOWN ALL FILES CAUSING PROBLEMS');
+        SL.Add('COMMENT3=THESE FILES WILL BE IGNORED ON SUBSEQUENT RUNS AS LONG AS "-NX" IS USED');
+        SL.Add('COMMENT4=----DO NOT DELETE THIS FILE-----------');
+        SL.Add('[FILES TO IGNORE]');
+        SL.Add('IGNORECOUNT=0');
+      end;
+
+      log('Writing filename to Ignore List: ' + InputFile , CHATTY);
+
+      ignorecount := StrToInt(sl.Values['IGNORECOUNT']);
+      INC(ignorecount);
+
+      timestamp := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+      sl.Add('IGNOREFILE' + INTTOSTR(ignorecount) + '=' + InputFile + '|' + Error + '|' + timestamp);
+      sl.Values['IGNORECOUNT'] := INTTOSTR(ignorecount);
+      sl.SaveToFile(ignorelistfilename);
+
+    finally
+      sl.free;
+    end;
+  end;
 end;
 
 
@@ -2167,6 +2258,9 @@ begin
         for I := 1 to ignorecount do
         BEGIN
          fn := FIgnoreErrorDocsFile.Values['IGNOREFILE' + INTTOSTR(I)];
+         // Extract just the file path from the ignore entry (before the first |)
+         if Pos('|', fn) > 0 then
+           fn := Copy(fn, 1, Pos('|', fn) - 1);
          log('Check Against: ' + fn, VERBOSE);
          if fn = DocumentPath then
          begin
