@@ -214,6 +214,9 @@ https://github.com/tobya/DocTo/wiki/OneDrive-Conversion
           batch job.
           --halterror
       -V  Show Versions.  DocTo and Word/Excel/Powerpoint
+      --conv-timeout <seconds> Set conversion timeout in seconds. Default 30 seconds.
+          If a document takes longer than this to convert, it will be skipped.
+      --skip-on-toc <true/false> Skip documents containing a Table of Contents. Default false.
     
     Long Parameters:
     

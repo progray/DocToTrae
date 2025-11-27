@@ -1,4 +1,4 @@
-﻿unit WordUtils;
+unit WordUtils;
 (*************************************************************
 Copyright © 2012 Toby Allen (https://github.com/tobya)
 
@@ -13,7 +13,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMA
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ****************************************************************)
 interface
-uses Classes, MainUtils, ResourceUtils,  ActiveX, ComObj, WinINet, Variants, sysutils, Types, StrUtils,Word_TLB_Constants, TypInfo;
+uses Classes, MainUtils, ResourceUtils,  ActiveX, ComObj, WinINet, Variants, sysutils, Types, StrUtils,Word_TLB_Constants, TypInfo, DocChecks, ErrorCodes;
 
 type
 
@@ -147,6 +147,32 @@ begin
 end;
 
 function TWordDocConverter.ExecuteConversion(fileToConvert: String; OutputFilename: String; OutputFileFormat : Integer): TConversionInfo;
+var
+  CheckResult: TDocCheckResult;
+begin
+  // Pre-open checks
+  CheckResult := CheckWordDocument(fileToConvert);
+  
+  // Check if document has TOC and we should skip it
+  if CheckResult.HasTOC and SkipDocsWithTOC then
+  begin
+    Result.Successful := False;
+    Result.Error := SKIPPED_TOC;
+    Result.ErrorMessage := MSG_SKIPPED_TOC;
+    Exit;
+  end;
+  
+  // Check if document is password protected
+  if CheckResult.IsPasswordProtected then
+  begin
+    Result.Successful := False;
+    Result.Error := SKIPPED_PASSWORD;
+    Result.ErrorMessage := MSG_SKIPPED_PASSWORD;
+    Exit;
+  end;
+  
+  // Original conversion code follows
+  // ...
 
 var
   EncodingValue : OleVariant;
@@ -186,18 +212,25 @@ begin
                                 );
 
 
-          // For some reason if the document contains a TableofContents, it hangs Word.  In older
-          // versions it popped up a dialog.  Until someone can find a work around, the docs will be skipped.
-          // Issue  #40  - experimental as it gets some false positives.
+          // Check for Table of Contents
           if SkipDocsWithTOC then
           begin
             if Wordapp.ActiveDocument.TablesOfContents.count > 0 then
             begin
              logInfo('[SKIPPED] - Document has TOC: ' + fileToConvert , STANDARD);
              Result.Successful := false;
-             Result.Error := '[SKIPPED] - Document has Table of Contents.';
+             Result.Error := 'SKIPPED_TOC';
              ExitAction := aClose;
             end;
+          end;
+
+          // Check for password protection
+          if Wordapp.ActiveDocument.ProtectionType <> wdNoProtection then
+          begin
+            logInfo('[SKIPPED] - Password Protected Document: ' + fileToConvert , STANDARD);
+            Result.Successful := false;
+            Result.Error := 'SKIPPED_PASSWORD';
+            ExitAction := aClose;
           end;
         except
         on E: Exception do
@@ -208,7 +241,7 @@ begin
           begin
              logInfo('[SKIPPED] - Password Protected:' + fileToConvert, STANDARD);
              Result.Successful := false;
-             Result.Error := '[SKIPPED] - Password Protected:';
+             Result.Error := 'SKIPPED_PASSWORD';
              ExitAction := aExit;
           end
           else

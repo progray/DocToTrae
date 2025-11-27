@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{2F967344-8067-49DA-9E3E-F6B7D7BC6CE5}</ProjectGuid>
         <MainSource>docto.dpr</MainSource>
@@ -300,6 +300,10 @@
         <DCCReference Include="Visio_TLB.pas"/>
         <DCCReference Include="shared\DynamicFileNameGenerator.pas"/>
         <DCCReference Include="Exceptions\DocToExceptions.pas"/>
+        <DCCReference Include="ErrorCodes.pas"/>
+        <DCCReference Include="IgnoreListManager.pas"/>
+        <DCCReference Include="TimeoutWatcher.pas"/>
+        <DCCReference Include="DocChecks.pas"/>
         <None Include="..\readme.md"/>
         <None Include="res\wdFormats.txt"/>
         <None Include="res\HelpLog.txt"/>
